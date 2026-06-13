@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>时之笛 · Web Clone</title>
+  <style>
+    :root {
+      --gold: #e6c45c;
+      --gold-dark: #9c7c2c;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    body {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #app { position: fixed; inset: 0; display: block; }
+
+    /* ---------- 通用覆盖层 ---------- */
+    .overlay {
+      position: fixed; inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #flash-white, #flash-red {
+      position: fixed; inset: 0; pointer-events: none; z-index: 40;
+      opacity: 0; transition: opacity 0.12s linear;
+    }
+    #flash-white { background: #fff; }
+    #flash-red { background: radial-gradient(ellipse at center, rgba(255,0,0,0) 35%, rgba(200,0,0,0.55) 100%); }
+    #vignette {
+      position: fixed; inset: 0; pointer-events: none; z-index: 5;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(0,0,0,0.38) 100%);
+    }
+
+    /* ---------- HUD ---------- */
+    #hud { z-index: 12; }
+    #hearts {
+      position: fixed; top: 18px; left: 20px;
+      display: flex; gap: 4px; flex-wrap: wrap; max-width: 320px;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+    }
+    #hearts svg { width: 26px; height: 24px; }
+    #rupees {
+      position: fixed; bottom: 18px; left: 22px;
+      display: flex; align-items: center; gap: 7px;
+      color: #fff; font-size: 20px; font-weight: 700;
+      text-shadow: 0 2px 3px rgba(0,0,0,0.7);
+      font-variant-numeric: tabular-nums;
+    }
+    #rupees svg { width: 16px; height: 26px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+    #keys {
+      position: fixed; bottom: 52px; left: 22px;
+      display: none; align-items: center; gap: 5px;
+      color: #ffd84a; font-size: 18px; font-weight: 700;
+      text-shadow: 0 2px 3px rgba(0,0,0,0.7);
+    }
+    #keys svg { width: 22px; height: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+    #time-icon {
+      position: fixed; top: 16px; right: 230px; width: 44px; height: 44px;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+    }
+
+    /* ---------- OoT 风格按钮组(右上) ---------- */
+    #btn-cluster {
+      position: fixed; top: 14px; right: 18px; z-index: 12;
+      display: flex; align-items: flex-start; gap: 10px;
+      filter: drop-shadow(0 3px 4px rgba(0,0,0,0.45));
+    }
+    .obtn {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+    }
+    .obtn .face {
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 2.5px solid rgba(255,255,255,0.75);
+      box-shadow: inset 0 -4px 8px rgba(0,0,0,0.35), inset 0 3px 6px rgba(255,255,255,0.3);
+    }
+    .obtn .keyhint {
+      font-size: 10.5px; color: rgba(255,255,255,0.85); letter-spacing: 0.5px;
+      text-shadow: 0 1px 2px #000;
+    }
+    #btn-b .face {
+      width: 52px; height: 52px; margin-top: 6px;
+      background: radial-gradient(circle at 35% 30%, #4fae5c, #1d7a32 70%);
+    }
+    #btn-a .face {
+      width: 60px; height: 60px;
+      background: radial-gradient(circle at 35% 30%, #5a9cf8, #1c50b8 70%);
+      flex-direction: column;
+    }
+    #btn-a .face span#a-label {
+      color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+      max-width: 54px; text-align: center; line-height: 1.15;
+    }
+    #btn-c .face {
+      width: 46px; height: 46px; margin-top: 10px;
+      background: radial-gradient(circle at 35% 30%, #ffd95e, #c89018 70%);
+    }
+    .obtn svg { width: 60%; height: 60%; }
+
+    /* ---------- 动作提示 ---------- */
+    #action-prompt {
+      position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
+      padding: 7px 18px; border-radius: 20px;
+      background: rgba(10, 24, 48, 0.72);
+      border: 1px solid rgba(120, 200, 255, 0.65);
+      color: #cfe9ff; font-size: 15px; letter-spacing: 1px;
+      display: none; z-index: 13;
+      box-shadow: 0 0 14px rgba(80, 170, 255, 0.35);
+    }
+    #action-prompt b { color: #7fd0ff; }
+
+    /* ---------- 对话框 ---------- */
+    #dialog {
+      position: fixed; bottom: 132px; left: 50%; transform: translateX(-50%);
+      width: min(620px, 86vw); min-height: 64px;
+      background: rgba(8, 8, 20, 0.82);
+      border: 2px solid rgba(220, 190, 110, 0.8); border-radius: 10px;
+      padding: 13px 18px; color: #fff; font-size: 16px; line-height: 1.65;
+      display: none; z-index: 14;
+      box-shadow: 0 4px 22px rgba(0,0,0,0.55), inset 0 0 24px rgba(60,40,0,0.25);
+    }
+    #dialog .speaker { color: var(--gold); font-weight: 700; margin-right: 6px; }
+    #dialog .dialog-next {
+      position: absolute; right: 14px; bottom: 6px;
+      color: #7fd0ff; font-size: 12.5px; letter-spacing: 1px;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+
+    /* ---------- 黑屏过渡 ---------- */
+    #fade-black {
+      position: fixed; inset: 0; pointer-events: none; z-index: 60;
+      background: #000; opacity: 0;
+    }
+
+    /* ---------- 歌曲横幅 ---------- */
+    #song-banner {
+      position: fixed; top: 24%; left: 50%; transform: translateX(-50%) scale(0.9);
+      padding: 12px 34px; border-radius: 6px;
+      background: linear-gradient(180deg, rgba(20,16,40,0.9), rgba(34,22,60,0.9));
+      border: 1px solid var(--gold);
+      color: var(--gold); font-size: 24px; font-weight: 700; letter-spacing: 4px;
+      opacity: 0; transition: opacity 0.3s, transform 0.3s; z-index: 20;
+      text-shadow: 0 0 12px rgba(230, 196, 92, 0.6);
+    }
+    #song-banner.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+    /* ---------- 陶笛音符显示 ---------- */
+    #ocarina-ui {
+      position: fixed; bottom: 170px; left: 50%; transform: translateX(-50%);
+      display: none; flex-direction: column; align-items: center; gap: 10px; z-index: 15;
+    }
+    #ocarina-staff {
+      display: flex; gap: 8px; min-height: 40px; align-items: center;
+      padding: 8px 16px; border-radius: 10px;
+      background: rgba(8, 8, 24, 0.66); border: 1px solid rgba(150,150,255,0.4);
+    }
+    .note-chip {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 800; color: #101020;
+      animation: notepop 0.18s ease-out;
+    }
+    .note-chip.n-up    { background: #ffd95e; }
+    .note-chip.n-down  { background: #ffd95e; }
+    .note-chip.n-left  { background: #ffd95e; }
+    .note-chip.n-right { background: #ffd95e; }
+    .note-chip.n-a     { background: #4f8cff; color: #fff; }
+    @keyframes notepop { from { transform: scale(0.3); } to { transform: scale(1); } }
+    #ocarina-hint { color: rgba(255,255,255,0.85); font-size: 13px; text-shadow: 0 1px 2px #000; letter-spacing: 1px; }
+
+    /* ---------- 标题画面 ---------- */
+    #title-screen {
+      position: fixed; inset: 0; z-index: 50;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 30%, #1b2c54 0%, #0a1020 55%, #05070e 100%);
+      transition: opacity 0.8s; pointer-events: auto;
+    }
+    #title-screen.hidden { opacity: 0; pointer-events: none; }
+    #title-screen .tri {
+      width: 110px; height: 96px; margin-bottom: 26px;
+      filter: drop-shadow(0 0 22px rgba(230,196,92,0.55));
+      animation: float 3.2s ease-in-out infinite;
+    }
+    @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    #title-screen h1 {
+      font-size: clamp(34px, 6vw, 62px); letter-spacing: 10px; font-weight: 900;
+      background: linear-gradient(180deg, #f8e7ae 10%, var(--gold) 45%, var(--gold-dark) 90%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      text-shadow: 0 4px 18px rgba(0,0,0,0.6);
+      margin-bottom: 6px;
+    }
+    #title-screen h2 {
+      color: #9db8e8; font-size: clamp(14px, 2vw, 19px); font-weight: 400; letter-spacing: 6px;
+      margin-bottom: 46px;
+    }
+    #press-start {
+      color: #fff; font-size: 19px; letter-spacing: 3px;
+      animation: blink 1.6s ease-in-out infinite;
+      border: 1px solid rgba(255,255,255,0.45); border-radius: 26px; padding: 11px 34px;
+      background: rgba(255,255,255,0.06); cursor: pointer;
+    }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    #title-screen .credit {
+      position: absolute; bottom: 22px; color: rgba(255,255,255,0.34); font-size: 12px; letter-spacing: 1px;
+      text-align: center; line-height: 1.8;
+    }
+
+    /* ---------- 控制说明 ---------- */
+    #controls-tip {
+      position: fixed; bottom: 14px; right: 16px; z-index: 12;
+      color: rgba(255,255,255,0.55); font-size: 12px; letter-spacing: 1px;
+      text-shadow: 0 1px 2px #000;
+    }
+    #controls-panel {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(6, 10, 22, 0.92); border: 1px solid rgba(150, 180, 255, 0.4);
+      border-radius: 12px; padding: 22px 30px; z-index: 30; display: none;
+      color: #dce8ff; font-size: 14.5px; line-height: 2.05; min-width: 340px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+    }
+    #controls-panel h3 { color: var(--gold); letter-spacing: 3px; margin-bottom: 10px; font-size: 17px; }
+    #controls-panel kbd {
+      display: inline-block; min-width: 26px; text-align: center;
+      background: #1d2940; border: 1px solid #44598a; border-bottom-width: 3px;
+      border-radius: 5px; padding: 1px 7px; margin-right: 6px;
+      font-family: inherit; font-size: 13px; color: #fff;
+    }
+    #controls-panel .dim { color: rgba(220,232,255,0.5); font-size: 12.5px; }
+
+    /* ---------- 游戏结束 ---------- */
+    #gameover-screen {
+      position: fixed; inset: 0; z-index: 45; display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(20, 0, 0, 0); transition: background 2s;
+      pointer-events: none;
+    }
+    #gameover-screen.show { display: flex; background: rgba(12, 0, 0, 0.82); pointer-events: auto; }
+    #gameover-screen h1 {
+      color: #c22; font-size: clamp(40px, 7vw, 70px); letter-spacing: 14px; font-weight: 900;
+      text-shadow: 0 0 30px rgba(255,0,0,0.5); margin-bottom: 30px;
+      opacity: 0; transition: opacity 2.5s;
+    }
+    #gameover-screen.show h1 { opacity: 1; }
+    #gameover-screen .retry { color: #eee; font-size: 17px; letter-spacing: 2px; animation: blink 1.6s infinite; opacity: 0; transition: opacity 1s 1.5s; }
+    #gameover-screen.show .retry { opacity: 1; }
+
+    /* ---------- 获得物品 ---------- */
+    #itemget-banner {
+      position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+      color: #fff; font-size: 22px; letter-spacing: 3px; font-weight: 700;
+      text-shadow: 0 0 16px rgba(255, 230, 140, 0.9), 0 2px 4px #000;
+      opacity: 0; transition: opacity 0.5s; z-index: 22;
+    }
+  </style>
+  <script type="module" crossorigin src="/z-clone/assets/index-mPBH8tms.js"></script>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div id="vignette"></div>
+
+  <div id="hud">
+    <div id="hearts"></div>
+    <div id="rupees"></div>
+    <div id="keys"></div>
+    <svg id="time-icon" viewBox="0 0 44 44"></svg>
+    <div id="btn-cluster">
+      <div class="obtn" id="btn-b">
+        <div class="face">
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="3" x2="12" y2="16" stroke="#eef4ff" stroke-width="2.6" stroke-linecap="round"/>
+            <line x1="7.5" y1="7.5" x2="16.5" y2="7.5" stroke="#eef4ff" stroke-width="2.2" stroke-linecap="round"/>
+            <line x1="12" y1="16" x2="12" y2="20" stroke="#caa84e" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="keyhint">J 挥剑</div>
+      </div>
+      <div class="obtn" id="btn-a">
+        <div class="face"><span id="a-label">行动</span></div>
+        <div class="keyhint">E / 空格</div>
+      </div>
+      <div class="obtn" id="btn-c">
+        <div class="face">
+          <svg viewBox="0 0 24 24">
+            <ellipse cx="12" cy="13" rx="9" ry="6.2" fill="#2a6ad8" stroke="#11337a" stroke-width="1.4" transform="rotate(-18 12 13)"/>
+            <circle cx="9" cy="10.5" r="1.5" fill="#0c2454"/>
+            <circle cx="13.5" cy="9.5" r="1.1" fill="#0c2454"/>
+            <circle cx="15" cy="13.5" r="1.1" fill="#0c2454"/>
+          </svg>
+        </div>
+        <div class="keyhint">O 陶笛</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="action-prompt"></div>
+  <div id="dialog"></div>
+  <div id="song-banner"></div>
+  <div id="itemget-banner"></div>
+
+  <div id="ocarina-ui">
+    <div id="ocarina-staff"></div>
+    <div id="ocarina-hint">↑ ↓ ← → / 空格 吹奏音符 · 按 O 收起陶笛</div>
+  </div>
+
+  <div id="controls-tip">H 操作说明</div>
+  <div id="controls-panel">
+    <h3>— 操 作 —</h3>
+    <div><kbd>W A S D</kbd> 移动 &nbsp; <kbd>空格</kbd> 翻滚</div>
+    <div><kbd>J</kbd>/<kbd>鼠标左键</kbd> 挥剑 &nbsp; <kbd>K</kbd>/<kbd>右键</kbd> 举盾</div>
+    <div><kbd>Tab</kbd> Z注视锁定 &nbsp; <kbd>E</kbd> 调查 / 互动</div>
+    <div><kbd>O</kbd> 取出陶笛 (方向键+空格吹奏)</div>
+    <div><kbd>Q</kbd> 或 <kbd>←</kbd><kbd>→</kbd> 旋转视角 &nbsp; <kbd>↑</kbd><kbd>↓</kbd> 俯仰 &nbsp; <kbd>滚轮</kbd> 缩放</div>
+    <div class="dim">试试这些旋律:太阳之歌 →↓↑→↓↑ · 塞尔达摇篮曲 ←↑→←↑→<br/>萨利亚之歌 ↓→←↓→← · 风暴之歌 空↓↑空↓↑ · 时之歌 →空↓→空↓</div>
+    <div class="dim" style="margin-top:6px">再按 <kbd>H</kbd> 关闭</div>
+  </div>
+
+  <div id="flash-white"></div>
+  <div id="flash-red"></div>
+  <div id="fade-black"></div>
+
+  <div id="gameover-screen">
+    <h1>GAME OVER</h1>
+    <div class="retry">按 Enter 重新开始</div>
+  </div>
+
+  <div id="title-screen">
+    <svg class="tri" viewBox="0 0 100 88">
+      <polygon points="50,0 75,44 25,44" fill="#e6c45c"/>
+      <polygon points="25,44 50,88 0,88" fill="#e6c45c"/>
+      <polygon points="75,44 100,88 50,88" fill="#e6c45c"/>
+    </svg>
+    <h1>时之笛</h1>
+    <h2>THE LEGEND OF ZELDA · WEB TRIBUTE</h2>
+    <div id="press-start">按 Enter 或 点击 开始冒险</div>
+    <div class="credit">非官方粉丝致敬作品 · 仅供学习交流<br/>WASD 移动 · J 挥剑 · Tab 锁定 · O 陶笛 · H 查看全部操作</div>
+  </div>
+
+</body>
+</html>
